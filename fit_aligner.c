@@ -14,6 +14,8 @@
 #include <libfdt.h>
 
 #define eprintf(args...) fprintf(stderr, args)
+#define __stringify(a) __stringify_r(a)
+#define __stringify_r(a) #a
 
 static const char *nodes_to_align[] = {
     "/images/kernel",
@@ -23,10 +25,12 @@ static const char *nodes_to_align[] = {
 
 static const char *propertyname = "data";
 
+#define DEFAULT_ALIGN 512
+
 void print_help(const char *argv0)
 {
     eprintf("Usage: %s -i input.fit -o output.fit [ -a <align_to> ]\n", argv0);
-    eprintf("Default alignment is 32 bytes\n");
+    eprintf("Default alignment is " __stringify(DEFAULT_ALIGN) " bytes\n");
 }
 
 int mmap_fdt(const char *fname, size_t size_inc,
@@ -180,7 +184,7 @@ int align_fit_node(int offset, int align_to)
 }
 
 int do_write_structs(void *fit_blob, FILE *output, const struct fit_segment *s,
-        const int *offsets, const int *node_offsets, int align_to)
+        const int *offsets, const int *node_offsets, int align_to, int *start_shift)
 {
     int delta_size = 0;
     int aoffsets[num_nodes];
@@ -193,7 +197,7 @@ int do_write_structs(void *fit_blob, FILE *output, const struct fit_segment *s,
     for (i = 0; i < num_nodes; i++) {
         if (offsets[i] >= 0) {
             aoffsets[asize] = offsets[i];
-            anodeoffsets[asize++] = node_offsets[i];// - sizeof (fdt32_t); // to get header
+            anodeoffsets[asize++] = node_offsets[i];
         }
     }
     qsort(aoffsets, asize, sizeof (int), cmp_ints);
@@ -204,7 +208,8 @@ int do_write_structs(void *fit_blob, FILE *output, const struct fit_segment *s,
     sbuf.len = anodeoffsets[0];
 
     /* write first part of section */
-    delta_size += move_segment(fit_blob, output, &sbuf);
+    *start_shift = move_segment(fit_blob, output, &sbuf);
+    delta_size = *start_shift;
 
     for (int i = 0; i < asize; i++) {
         sbuf.len = anodeoffsets[i + 1] - anodeoffsets[i];
@@ -302,16 +307,20 @@ void do_align(void *fit_blob, FILE *output, int align_to)
     /* write sections one after another */
     int add = 0;
     for (i = 0; i < 4; i++) {
+        int start_shift = 0;
         if (i > 0) {
             *(segments[i].header_piece) += add;
         }
 
         if (segments[i].header_piece == &(header_copy.off_dt_struct)) {
-            int ssize = do_write_structs(fit_blob, output, &segments[i], offsets, node_offsets, align_to);
+            int ssize = do_write_structs(fit_blob, output, &segments[i], offsets, node_offsets, align_to, &start_shift);
             add += ssize;
             header_copy.size_dt_struct += ssize;
         } else {
-            add += move_segment(fit_blob, output, &segments[i]);
+            start_shift = move_segment(fit_blob, output, &segments[i]);
+            if (segments[i].header_piece != NULL)
+                *(segments[i].header_piece) += start_shift;
+            add += start_shift;
         }
     }
     header_copy.totalsize += add;
@@ -340,7 +349,7 @@ void do_align(void *fit_blob, FILE *output, int align_to)
 int main(int argc, char *argv[])
 {
     const char *input_file = NULL, *output_file = NULL;
-    int align_to = 32;
+    int align_to = DEFAULT_ALIGN;
     void *fit_blob;
     int ffd;
     struct stat fsbuf;
