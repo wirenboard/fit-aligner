@@ -17,20 +17,24 @@
 #define __stringify(a) __stringify_r(a)
 #define __stringify_r(a) #a
 
-static const char *nodes_to_align[] = {
-    "/images/kernel",
-    "/images/dtb"
-};
-#define num_nodes ((int) (sizeof (nodes_to_align) / sizeof (nodes_to_align[0])))
-
-static const char *propertyname = "data";
-
 #define DEFAULT_ALIGN 512
+#define DEFAULT_PROPERTY "data"
+
+static char **nodes_to_align = NULL;
+static size_t num_nodes = 0;
+static const char *propertyname = DEFAULT_PROPERTY;
+static int verbose = 0;
 
 void print_help(const char *argv0)
 {
-    eprintf("Usage: %s -i input.fit -o output.fit [ -a <align_to> ]\n", argv0);
-    eprintf("Default alignment is " __stringify(DEFAULT_ALIGN) " bytes\n");
+    eprintf("Usage: %s -i input.fit -o output.fit [-a <align_to>] "
+            "[-p <property name>] NODE1 ... \n\n", argv0);
+
+    eprintf("\t-i input.fit\n\t\tinput (unaligned) FIT file\n");
+    eprintf("\t-o output.fit\n\t\toutput (aligned) FIT file name\n");
+    eprintf("\t-a <align_to>\n\t\tvalue to align (default is " __stringify(DEFAULT_ALIGN) " bytes)\n");
+    eprintf("\t-p property_name\n\t\tproperty to align in nodes (default is '" DEFAULT_PROPERTY "')\n");
+    eprintf("\t-h\tprint that help message and exit\n\n");
 }
 
 int mmap_fdt(const char *fname, size_t size_inc,
@@ -187,12 +191,21 @@ int do_write_structs(void *fit_blob, FILE *output, const struct fit_segment *s,
         const int *offsets, const int *node_offsets, int align_to, int *start_shift)
 {
     int delta_size = 0;
-    int aoffsets[num_nodes];
-    int anodeoffsets[num_nodes + 1];
-    int i;
+    int *aoffsets = (int *) malloc(num_nodes * sizeof (int));
+    int *anodeoffsets = (int *) malloc((num_nodes + 1) * sizeof (int));
+    unsigned int i;
     int asize = 0;
     struct fit_segment sbuf;
 
+    if (!aoffsets) {
+        perror("malloc");
+        exit(1);
+    }
+
+    if (!anodeoffsets) {
+        perror("malloc");
+        exit(1);
+    }
     /* prepare actual offsets */
     for (i = 0; i < num_nodes; i++) {
         if (offsets[i] >= 0) {
@@ -222,6 +235,9 @@ int do_write_structs(void *fit_blob, FILE *output, const struct fit_segment *s,
         move_unaligned(fit_blob, output, &sbuf);
     }
 
+    free(aoffsets);
+    free(anodeoffsets);
+
     return delta_size;
 }
 
@@ -244,9 +260,19 @@ void print_fdt_header(const struct fdt_header *h)
 
 void do_align(void *fit_blob, FILE *output, int align_to)
 {
-    int offsets[num_nodes];
-    int node_offsets[num_nodes];
-    int i;
+    int *offsets = (int *) malloc(num_nodes * sizeof (int));
+    int *node_offsets = (int *) malloc(num_nodes * sizeof (int));
+    unsigned int i;
+
+    if (!offsets) {
+        perror("malloc");
+        exit(1);
+    }
+
+    if (!node_offsets) {
+        perror("malloc");
+        exit(1);
+    }
 
     /* get required offsets */
     for (i = 0; i < num_nodes; i++) {
@@ -266,7 +292,9 @@ void do_align(void *fit_blob, FILE *output, int align_to)
         eprintf("\tOffset of prop is %u\n", offsets[i]);
     }
 
-    print_fdt_header((const struct fdt_header *) fit_blob);
+    if (verbose) {
+        print_fdt_header((const struct fdt_header *) fit_blob);
+    }
 
     /* read sections info */
     struct fdt_header header_copy;
@@ -335,15 +363,20 @@ void do_align(void *fit_blob, FILE *output, int align_to)
     fdt_set_size_dt_struct(&new_header, header_copy.size_dt_struct);
     fdt_set_totalsize(&new_header, header_copy.totalsize);
 
-    print_fdt_header(&new_header);
+    if (verbose) {
+        print_fdt_header(&new_header);
+    }
 
     fseek(output, 0, SEEK_SET);
     if (fwrite(&new_header, sizeof (new_header), 1, output) != 1) {
         eprintf("Failed to rewrite header of new FIT file: %s\n", strerror(errno));
-        return;
+        exit(1);
     }
 
     fseek(output, 0, SEEK_END);
+
+    free(offsets);
+    free(node_offsets);
 }
 
 int main(int argc, char *argv[])
@@ -356,7 +389,7 @@ int main(int argc, char *argv[])
     FILE *output;
 
     int c;
-    while ((c = getopt(argc, argv, "i:o:a:h")) != -1) {
+    while ((c = getopt(argc, argv, "i:o:a:p:hv")) != -1) {
         switch (c) {
         case 'i':
             input_file = optarg;
@@ -367,11 +400,27 @@ int main(int argc, char *argv[])
         case 'a':
             align_to = atoi(optarg);
             break;
+        case 'p':
+            propertyname = optarg;
+            break;
+        case 'v':
+            verbose = 1;
+            break;
         case 'h':
         default:
             print_help(argv[0]);
             exit(0);
         }
+    }
+
+    /* fill in nodes list */
+    nodes_to_align = &argv[optind];
+    num_nodes = argc - optind;
+
+    if (num_nodes == 0) {
+        eprintf("No nodes to align!\n");
+        print_help(argv[0]);
+        exit(1);
     }
 
     if (!input_file) {
