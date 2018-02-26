@@ -31,6 +31,5 @@ $ ./fit_aligner -i input.fit -o output.fit -a 512
 TODO
 ----
 
- * Debian package
  * Nodes list from command line
  * Cleaning up
