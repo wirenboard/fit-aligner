@@ -1,2 +1,2 @@
 buildDebArchAll aptlyConfig: 'devtools-aptly-config', 
-                uploadJob: 'contactless/wb-dev-tools-releases/master'
+                uploadJob: 'wirenboard/wb-dev-tools-releases/master'
