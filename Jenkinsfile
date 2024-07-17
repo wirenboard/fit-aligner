@@ -1,2 +1,2 @@
-buildDebArchAll aptlyConfig: 'devtools-aptly-config', 
-                uploadJob: 'wirenboard/wb-dev-tools-releases/master'
+buildDebSbuild defaultTargets: 'bullseye-armhf bullseye-arm64 bullseye-host',
+               repos: ['devTools']
