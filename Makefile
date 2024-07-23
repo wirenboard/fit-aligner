@@ -1,3 +1,5 @@
+PREFIX=/usr
+
 TARGET=fit-aligner
 
 OBJS=fit-aligner.o
@@ -11,9 +13,7 @@ $(TARGET): $(OBJS)
 	$(CC) $(CFLAGS) $(OBJS) -o $(TARGET) $(LDFLAGS)
 
 install:
-	mkdir -p $(DESTDIR)/usr/bin
-
-	install -m 0755 $(TARGET) $(DESTDIR)/usr/bin/fit-aligner
+	install -Dm0755 $(TARGET) -t $(DESTDIR)$(PREFIX)/bin
 
 clean:
 	rm -rf $(TARGET) $(OBJS)

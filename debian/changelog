@@ -1,3 +1,9 @@
+fit-aligner (0.1.1) stable; urgency=medium
+
+  * Add armhf/arm64 build, no functional changes
+
+ -- Nikolay Korotkiy <nikolay.korotkiy@wirenboard.com>  Wed, 17 Jul 2024 20:06:00 +0400
+
 fit-aligner (0.1) stable; urgency=medium
 
   * Initial release. (Closes: #XXXXXX)
