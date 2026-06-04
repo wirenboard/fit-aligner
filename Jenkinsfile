@@ -1,2 +1,3 @@
-buildDebSbuild defaultTargets: 'bullseye-armhf bullseye-arm64 bullseye-host',
-               repos: ['devTools']
+buildDebSbuild defaultTargets: 'current-armhf current-arm64 current-host',
+               repos: ['devTools'],
+               defaultRunLintian: true

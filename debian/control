@@ -1,12 +1,12 @@
 Source: fit-aligner
-Maintainer: Nikita Maslov <n.maslov@contactless.ru>
+Maintainer: Wiren Board team <info@wirenboard.com>
 Section: misc
 Priority: optional
-Standards-Version: 3.9.2
-Build-Depends: debhelper (>= 9), libfdt-dev
+Standards-Version: 4.5.1
+Build-Depends: debhelper-compat (= 13), libfdt-dev
 
 Package: fit-aligner
 Architecture: any
 Depends: ${shlibs:Depends}, ${misc:Depends}, libfdt1
 Description: A tool to align property blobs in FIT images to improve
-    U-boot performance on partial loading
+ U-boot performance on partial loading
